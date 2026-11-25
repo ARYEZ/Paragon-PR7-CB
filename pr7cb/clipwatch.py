@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QMimeData, QObject, QTimer, QUrl, Signal
+from PySide6.QtCore import QBuffer, QByteArray, QDir, QIODevice, QMimeData, QObject, QTimer, QUrl, Signal
 from PySide6.QtGui import QClipboard, QImage
 from PySide6.QtWidgets import QApplication
 
@@ -49,7 +49,7 @@ def clip_from(md: QMimeData, max_image: int = 20_000_000) -> Clip | None:
     if md is None:
         return None
     if md.hasUrls():
-        files = [u.toLocalFile() for u in md.urls() if u.isLocalFile()]
+        files = [QDir.toNativeSeparators(u.toLocalFile()) for u in md.urls() if u.isLocalFile()]   # C:\\ on Windows
         if files and len(files) == len(md.urls()):
             return Clip("files", "\n".join(files), files=files)
     if md.hasText() and md.text().strip():
@@ -108,6 +108,8 @@ class Watcher(QObject):
 
     def stop(self):
         """No more recording (closing, or a test done): reads already scheduled do nothing either."""
+        if self.stopped:
+            return
         self.stopped = True
         try:
             self.clipboard.dataChanged.disconnect(self._signal)

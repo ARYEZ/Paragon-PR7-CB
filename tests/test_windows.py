@@ -26,10 +26,14 @@ def test_start_with_windows():
         start_with_windows(False)
 
 
-def test_a_copy_names_its_program(qapp):
-    from pr7cb import winclip
-    qapp.clipboard().setText("from this test")
-    qapp.processEvents()
-    name = winclip.clipboard_source().lower()
-    assert name.startswith("python") or name.startswith("pr7-cb")
-    qapp.clipboard().clear()
+def test_a_copy_names_its_program():
+    """On Windows' real clipboard (the offscreen platform keeps copies inside the program, so a separate process on
+    the real "windows" platform): the copy's owner is this Python."""
+    import subprocess
+    code = ("import sys; sys.path.insert(0, sys.argv[1]); from PySide6.QtWidgets import QApplication; "
+            "a = QApplication([]); a.clipboard().setText('from this test'); a.processEvents(); "
+            "from pr7cb import winclip; print(winclip.clipboard_source()); a.clipboard().clear()")
+    env = {k: v for k, v in os.environ.items() if k != "QT_QPA_PLATFORM"}
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out = subprocess.run([sys.executable, "-c", code, root], env=env, capture_output=True, text=True, timeout=60)
+    assert out.stdout.strip().lower().startswith("python"), (out.stdout, out.stderr)
