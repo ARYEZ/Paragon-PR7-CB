@@ -30,6 +30,8 @@ Python; explain the why of changes.
 - Updates: `pr7cb/updates.py` / `update_ui.py` (the family's files, keep them in step; with PR7-U installed,
   update_ui offers it); `family.py`: the family's AppIds (PR7-CB included).
 
+- `pr7cb/finish.py` (no Qt): the family's finish (OBSIDIAN / AURORA), one choice for every app: HKCU\Software\Paragon\Family "Finish" (a file elsewhere; PARAGON_FAMILY_FILE in tests, conftest). `finish.start` at start-up, `set_finish` saves it, app.py's 2 s timer `finish.follow`s another app's switch. The same file in every family app: keep them in step.
+
 ## The look (family rules)
 
 - Theme is PR7-DU's (OBSIDIAN + AURORA). Colours: the family's only; Inter; labels UPPER CASE.

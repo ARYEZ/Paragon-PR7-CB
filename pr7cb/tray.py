@@ -14,7 +14,7 @@ from PySide6.QtGui import QCursor, QIcon
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                QMenu, QMessageBox, QPushButton, QSpinBox, QSystemTrayIcon, QVBoxLayout)
 
-from . import __version__, hotkeys, settings, theme, widgets, winclip
+from . import __version__, finish, hotkeys, settings, theme, widgets, winclip
 from .clipwatch import Watcher
 from .popup import Popup
 from .store import Clip, Store
@@ -111,6 +111,12 @@ class TrayApp(QObject):
         self.acts["pause"].setCheckable(True)
         self.acts["pause"].toggled.connect(self.pause)
         m.addSeparator()
+        fin = m.addMenu("Finish")
+        for name in ("obsidian", "aurora"):
+            a = fin.addAction(name.upper(), lambda n=name: self.set_finish(n))
+            a.setCheckable(True)
+            a.setChecked(theme.FINISH == name)
+            self.acts[f"finish_{name}"] = a
         m.addAction("Options...", self.options)
         m.addAction("Clear history...", self.clear)
         m.addSeparator()
@@ -173,6 +179,19 @@ class TrayApp(QObject):
             self.popup.refresh()
 
     # ---------------------------------------------------------------- Options
+    def set_finish(self, name: str):
+        """OBSIDIAN or AURORA, for the popup and (finish.py) every other family app."""
+        theme.set_finish(name)
+        finish.set(theme.FINISH)                 # every family app follows (finish.py)
+        settings.set("finish", theme.FINISH)
+        app = QApplication.instance()
+        app.setPalette(theme.palette())
+        self.popup.restyle()
+        self.popup.update()
+        for n in ("obsidian", "aurora"):
+            if f"finish_{n}" in self.acts:
+                self.acts[f"finish_{n}"].setChecked(theme.FINISH == n)
+
     def options(self):
         d = OptionsDialog(self)
         self.options_dialog = d
