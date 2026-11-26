@@ -1,3 +1,3 @@
 """Paragon PR7-CB: clipboard history, the way Ditto keeps it."""
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
