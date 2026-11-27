@@ -7,6 +7,7 @@ put on the clipboard. `answers` replaces dialogs and `paste` the key presses in 
 from __future__ import annotations
 
 import json
+import os
 import sys
 
 from PySide6.QtCore import QObject, QPoint, QTimer, Signal
@@ -43,10 +44,45 @@ def option(key: str):
     return settings.get(key, d)
 
 
+AUTOSTART_NAME = "paragon-pr7-cb.desktop"
+
+
+def autostart_file() -> str:
+    """Linux: your own sign-in autostart entry (freedesktop.org's autostart folder; Plasma reads it)."""
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(base, "autostart", AUTOSTART_NAME)
+
+
+def system_autostart() -> bool:
+    """PR7-OS starts PR7-CB for everyone (/etc/xdg/autostart); your own entry of the same name overrides it."""
+    dirs = (os.environ.get("XDG_CONFIG_DIRS") or "/etc/xdg").split(":")
+    return any(os.path.exists(os.path.join(d, "autostart", AUTOSTART_NAME)) for d in dirs if d)
+
+
 def start_with_windows(on: bool | None = None) -> bool:
-    """Read (on=None) or set the HKCU Run entry that starts PR7-CB (quietly) when you sign in."""
+    """Read (on=None) or set what starts PR7-CB (quietly) when you sign in: the HKCU Run entry on Windows, an autostart
+    entry on Linux; off while PR7-OS starts it for everyone = your own entry with Hidden=true (PR7-Q's way)."""
     if sys.platform != "win32":
-        return False
+        path = autostart_file()
+        if on is None:
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as f:
+                    return "\nHidden=true" not in f.read()
+            return system_autostart()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        if on:
+            import shlex
+            import shutil
+            command = shutil.which("pr7-cb") or f"{shlex.quote(sys.executable)} -m pr7cb"
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("[Desktop Entry]\nType=Application\nName=Paragon PR7-CB\nComment=Clipboard history\n"
+                        f"Exec={command} --tray\nIcon=paragon-pr7-cb\nX-GNOME-Autostart-enabled=true\n")
+        elif system_autostart():
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("[Desktop Entry]\nType=Application\nName=Paragon PR7-CB\nHidden=true\n")
+        elif os.path.exists(path):
+            os.remove(path)
+        return on
     import winreg
     exe = f'"{sys.executable}" --tray' if getattr(sys, "frozen", False) else \
         f'"{sys.executable.replace("python.exe", "pythonw.exe")}" -m pr7cb --tray'
@@ -70,12 +106,17 @@ def start_with_windows(on: bool | None = None) -> bool:
 class TrayApp(QObject):
     pasted = Signal(object, bool)
 
-    def __init__(self, store: Store | None = None, show_tray: bool = True, source=None):
+    def __init__(self, store: Store | None = None, show_tray: bool = True, source=None, klipper_source=None):
         super().__init__()
         self.answers: dict = {}
         self.store = store or Store()
         self.watcher = Watcher(self.store, self._watch_options, source=source)
         self.watcher.recorded.connect(lambda _: self._maybe_trim())
+        self.klipper = None                     # Linux (Plasma): Klipper feeds the history (klipper.py)
+        if sys.platform != "win32" and klipper_source is not False:
+            from .klipper import KlipperSource
+            self.klipper = klipper_source or KlipperSource(self.store, self.watcher, parent=self)
+            self.klipper.recorded.connect(lambda _: self._maybe_trim())
         self.popup = Popup(self.store)
         self.popup.chosen.connect(self.paste)
         self.popup.menu_wanted.connect(lambda pos: self.menu.exec(pos))
@@ -142,6 +183,10 @@ class TrayApp(QObject):
     def show_popup(self, at_mouse: bool = False):
         self.previous = winclip.foreground()
         point = None
+        if QApplication.platformName().startswith("wayland"):     # the pointer isn't known there: the screen's middle
+            self.popup.restyle()
+            self.popup.show_at(None)
+            return
         if not at_mouse and option("popup_at") == "caret":
             got = winclip.caret(self.previous)
             if got:
@@ -162,6 +207,8 @@ class TrayApp(QObject):
 
     def pause(self, on: bool):
         self.watcher.paused = on
+        if self.klipper is not None:
+            self.klipper.paused = on
         if self.tray:
             self.tray.setToolTip("Paragon PR7-CB (paused)" if on else "Paragon PR7-CB")
 
@@ -267,8 +314,8 @@ class OptionsDialog(QDialog):
         box.addWidget(note)
         self.plain = QCheckBox("Paste as plain text by default"); self.plain.setChecked(option("plain_default"))
         self.images = QCheckBox("Keep pictures (up to 20 MB each)"); self.images.setChecked(option("keep_images"))
-        self.startup = QCheckBox("Start PR7-CB with Windows"); self.startup.setChecked(start_with_windows())
-        self.startup.setEnabled(sys.platform == "win32")
+        self.startup = QCheckBox("Start PR7-CB with Windows" if sys.platform == "win32" else "Start PR7-CB when I sign in")
+        self.startup.setChecked(start_with_windows())
         from . import update_ui
         self.updates = QCheckBox("Check for updates automatically"); self.updates.setChecked(update_ui.auto_enabled())
         for c in (self.plain, self.images, self.startup, self.updates):
@@ -294,7 +341,7 @@ class OptionsDialog(QDialog):
         settings.set("ignore", [n.strip() for n in self.ignore.text().split(";") if n.strip()])
         settings.set("plain_default", self.plain.isChecked())
         settings.set("keep_images", self.images.isChecked())
-        if sys.platform == "win32" and self.startup.isChecked() != start_with_windows():
+        if self.startup.isChecked() != start_with_windows():
             start_with_windows(self.startup.isChecked())
         from . import update_ui
         update_ui.set_auto(self.updates.isChecked())

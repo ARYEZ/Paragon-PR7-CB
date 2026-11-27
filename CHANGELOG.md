@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0
+
+PR7-CB runs on Linux's Plasma desktop (PR7-OS):
+- **Klipper feeds the history.** On Wayland only the window in front may read the clipboard, so PR7-CB asks Plasma's
+  own clipboard keeper (Klipper) once a second and keeps what's new: your history (search, pins, numbers, the popup)
+  is PR7-CB's, the copies are the ones Plasma saw. The first time, Klipper's existing history comes in too. Copies
+  marked private (PR7-PM's passwords) never reach Klipper, so never reach PR7-CB.
+- **Choosing a clip puts it on the clipboard; press Ctrl+V to paste it.** Wayland doesn't let one program type into
+  another, so PR7-CB can't paste for you there.
+- The popup opens in the middle of the screen (Wayland doesn't say where the pointer is); Ctrl+` is a Plasma shortcut;
+  start at sign-in is an autostart entry.
+Nothing changes on Windows.
+
 ## 0.2.3
 
 - The family list (`family.py`) knows the three newest Paragon apps: PR7-HW (hardware information), PR7-BK

@@ -13,6 +13,11 @@ Python; explain the why of changes.
 - `pr7cb/clipwatch.py`: `Watcher` reads QClipboard a moment after dataChanged (QTimer 0); `private(md)` =
   ExcludeClipboardContentFromMonitorProcessing / Clipboard Viewer Ignore / CanIncludeInClipboardHistory = 0;
   ignored programs (Options), pause, its own pastes (`put`) skipped; files > text > picture. `stop()` before closing.
+- **Linux (PR7-OS, Wayland)**: `klipper.py` = Klipper's history (org.kde.klipper getClipboardHistoryMenu, through
+  jeepney: a Linux-only requirement) polled by `KlipperSource` (first look: the whole history; then the newest item;
+  PR7-CB's own puts skipped via the watcher's `_ours` / `_plain_text`; `paused`). No paste keys there (choose, then
+  Ctrl+V: `hotkeys.LINUX_NOTE`); the popup centres on Wayland; start at sign-in = autostart (Hidden=true overrides
+  PR7-OS's). Tests: tests/test_linux.py with `standin_klipper.py` (its own process) on a private dbus-daemon.
 - `pr7cb/winclip.py` (ctypes, Windows; no-ops elsewhere): `clipboard_source` (owner window's program), `caret`
   (GetGUIThreadInfo), `paste_into(hwnd)` (SetForegroundWindow, held modifiers released, Ctrl+V by SendInput).
 - `pr7cb/popup.py`: `Popup` (frameless tool window; keys in `handle_key`), `ClipModel` (plain Python list model),
